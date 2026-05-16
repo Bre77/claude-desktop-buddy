@@ -1,10 +1,10 @@
 #include "character.h"
-#include <M5StickCPlus.h>
+#include <M5Dial.h>
 #include <LittleFS.h>
 #include <AnimatedGIF.h>
 #include <ArduinoJson.h>
 
-extern TFT_eSprite spr;
+extern M5Canvas spr;
 
 static const char* STATE_NAMES[] = {
   "sleep", "idle", "busy", "attention", "celebrate", "dizzy", "heart"
@@ -37,21 +37,21 @@ static uint8_t curState = 0xFF;
 static AnimatedGIF gif;
 static File        gifFile;
 static int         gifX = 0, gifY = 0, gifW = 0, gifH = 0;
-// Peek mode pins the GIF bottom to the info-panel top (y=70) so the pet
-// sits on the panel edge regardless of canvas height. Home mode centers
-// in the upper 140px. No padding assumed in the source art.
-static const int   PEEK_TOP = 70;
+// Peek mode pins the GIF inside the upper panel header strip so the pet
+// peeks above an info/menu panel. Home mode centers it in the 240×240 disc.
+// No padding assumed in the source art.
+static const int   PEEK_TOP = 90;
 static bool        peekMode = false;
 // Draw target — defaults to the sprite; characterRenderTo() retargets to
-// M5.Lcd for the landscape clock (both inherit TFT_eSPI).
-static TFT_eSPI*   _tgt = &spr;
+// the live display. M5Canvas and M5GFX share LovyanGFX as a base.
+static LovyanGFX*  _tgt = &spr;
 // Peek mode renders at half scale (2:1 nearest-neighbor in gifDrawCb) so
-// the whole pet fits the 70px window instead of cropping the top.
+// the pet fits the header window without cropping.
 static void gifPlace() {
   int outW = peekMode ? gifW / 2 : gifW;
   int outH = peekMode ? gifH / 2 : gifH;
   gifX = (spr.width() - outW) / 2;
-  gifY = peekMode ? (PEEK_TOP - outH) / 2 : (140 - outH) / 2;
+  gifY = peekMode ? (PEEK_TOP - outH) / 2 : (spr.height() - outH) / 2;
 }
 static uint32_t    nextFrameAt = 0;
 static uint32_t    animPauseUntil = 0;
@@ -247,12 +247,12 @@ bool characterInit(const char* name) {
 bool characterLoaded() { return loaded; }
 const Palette& characterPalette() { return pal; }
 
-// One-shot half-scale render to an arbitrary surface (M5.Lcd for the
-// landscape clock). Caller owns clearing. Advances frame timing so
-// animation runs even when characterTick() is bypassed.
-void characterRenderTo(TFT_eSPI* tgt, int cx, int cy) {
+// One-shot half-scale render to an arbitrary surface. Caller owns
+// clearing. Advances frame timing so animation runs even when
+// characterTick() is bypassed.
+void characterRenderTo(M5GFX* tgt, int cx, int cy) {
   if (!gifOpen) return;   // caller opens via characterSetState(activeState)
-  TFT_eSPI* prevT = _tgt; bool prevP = peekMode; int px = gifX, py = gifY;
+  LovyanGFX* prevT = _tgt; bool prevP = peekMode; int px = gifX, py = gifY;
   _tgt = tgt; peekMode = true;
   gifX = cx - gifW / 4;
   gifY = cy - gifH / 4;

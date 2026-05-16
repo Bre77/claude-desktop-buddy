@@ -72,7 +72,7 @@ const char* petName();
 void ownerSet(const char* name);
 const char* ownerName();
 #include "stats.h"
-#include <M5StickCPlus.h>
+#include <M5Dial.h>
 
 inline bool xferCommand(JsonDocument& doc) {
   const char* cmd = doc["cmd"];
@@ -112,11 +112,15 @@ inline bool xferCommand(JsonDocument& doc) {
   if (strcmp(cmd, "status") == 0) {
     // Dump everything the info screens show. Manual printf rather than
     // ArduinoJson serialize — less heap churn, and the shape is fixed.
-    int vBat = (int)(M5.Axp.GetBatVoltage() * 1000);
-    int iBat = (int)M5.Axp.GetBatCurrent();
-    int vBus = (int)(M5.Axp.GetVBusVoltage() * 1000);
-    int pct = (vBat - 3200) / 10;
-    if (pct < 0) pct = 0; if (pct > 100) pct = 100;
+    // M5 Dial has no on-board fuel gauge; the M5Unified Power_Class
+    // returns -1 when no PMU is available, so we just report 0 and the
+    // USB flag from getBatteryLevel()>=0 / USB detection. Power.getBatteryVoltage()
+    // returns mV directly on supported boards, -1 otherwise.
+    int pct = M5Dial.Power.getBatteryLevel();
+    int vBat = M5Dial.Power.getBatteryVoltage();
+    bool usb = M5Dial.Power.isCharging() == m5::Power_Class::is_charging_t::is_charging;
+    if (pct < 0) pct = 0;
+    if (vBat < 0) vBat = 0;
     char b[320];
     int len = snprintf(b, sizeof(b),
       "{\"ack\":\"status\",\"ok\":true,\"n\":0,\"data\":{"
@@ -126,7 +130,7 @@ inline bool xferCommand(JsonDocument& doc) {
       "\"stats\":{\"appr\":%u,\"deny\":%u,\"vel\":%u,\"nap\":%lu,\"lvl\":%u}"
       "}}\n",
       petName(), ownerName(), bleSecure() ? "true" : "false",
-      pct, vBat, iBat, (vBus > 4000) ? "true" : "false",
+      pct, vBat, 0, usb ? "true" : "false",
       millis() / 1000, ESP.getFreeHeap(),
       (unsigned long)(LittleFS.totalBytes() - LittleFS.usedBytes()),
       (unsigned long)LittleFS.totalBytes(),
