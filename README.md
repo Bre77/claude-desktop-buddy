@@ -11,21 +11,19 @@ fun little hardware devices that integrate with Claude.
 > **[REFERENCE.md](REFERENCE.md)** for the wire protocol: Nordic UART
 > Service UUIDs, JSON schemas, and the folder push transport.
 
-As an example, we built a desk pet on ESP32 that lives off permission
+As an example, we built a desk pet on the M5 Dial that lives off permission
 approvals and interaction with Claude. It sleeps when nothing's happening,
 wakes when sessions start, gets visibly impatient when an approval prompt is
 waiting, and lets you approve or deny right from the device.
 
-<p align="center">
-  <img src="docs/device.jpg" alt="M5StickC Plus running the buddy firmware" width="500">
-</p>
-
 ## Hardware
 
-The firmware targets ESP32 with the Arduino framework. As written, it
-depends on the M5StickCPlus library for its display, IMU, and button
-drivers—so you'll need that board, or a fork that swaps those drivers for
-your own pin layout.
+The firmware targets the **[M5 Dial](https://docs.m5stack.com/en/core/M5Dial)**
+(ESP32-S3, 1.28" round 240×240 GC9A01 display, rotary encoder with click
+button, BM8563 RTC, piezo buzzer). It depends on the `m5stack/M5Dial`
+PlatformIO library (which pulls in M5Unified + M5GFX). To target a
+different board you'd need to swap that dependency and adjust the
+geometry constants in `src/main.cpp` and `src/buddy.cpp`.
 
 ## Flashing
 
@@ -68,18 +66,17 @@ If discovery isn't finding the stick:
 
 ## Controls
 
-|                         | Normal               | Pet         | Info        | Approval    |
-| ----------------------- | -------------------- | ----------- | ----------- | ----------- |
-| **A** (front)           | next screen          | next screen | next screen | **approve** |
-| **B** (right)           | scroll transcript    | next page   | next page   | **deny**    |
-| **Hold A**              | menu                 | menu        | menu        | menu        |
-| **Power** (left, short) | toggle screen off    |             |             |             |
-| **Power** (left, ~6s)   | hard power off       |             |             |             |
-| **Shake**               | dizzy                |             |             | —           |
-| **Face-down**           | nap (energy refills) |             |             |             |
+The M5 Dial is driven by a single rotary encoder with a click button:
+
+|                | Normal              | Pet / Info  | Menu / Settings | Approval                  |
+| -------------- | ------------------- | ----------- | --------------- | ------------------------- |
+| **Rotate**     | scroll transcript   | next page   | move selection  | toggle **OK** ↔ **NO**    |
+| **Press**      | next screen         | next screen | confirm         | **send chosen decision**  |
+| **Hold press** | menu                | menu        | close panel     | menu                      |
 
 The screen auto-powers-off after 30s of no interaction (kept on while an
-approval prompt is up). Any button press wakes it.
+approval prompt is up, or while plugged into USB). Any rotation or press
+wakes it.
 
 ## ASCII pets
 
@@ -122,11 +119,12 @@ State values can be a single filename or an array. Arrays rotate: each
 loop-end advances to the next GIF, useful for an idle activity carousel so
 the home screen doesn't loop one clip forever.
 
-GIFs are 96px wide; height up to ~140px stays on a 135×240 portrait screen.
-Crop tight to the character — transparent margins waste screen and shrink
-the sprite. `tools/prep_character.py` handles the resize: feed it source
-GIFs at any sizes and it produces a 96px-wide set where the character is the
-same scale in every state.
+GIFs render centered on the 240×240 round face. Keep them under ~180×180
+so corners stay clear of the round bezel, and crop tight to the character
+— transparent margins waste screen and shrink the sprite.
+`tools/prep_character.py` handles the resize: feed it source GIFs at any
+sizes and it produces a normalized set where the character is the same
+scale in every state.
 
 The whole folder must fit under 1.8MB —
 `gifsicle --lossy=80 -O3 --colors 64` typically cuts 40–60%.
@@ -144,9 +142,9 @@ If you're iterating on a character and would rather skip the BLE round-trip,
 | `sleep`     | bridge not connected        | eyes closed, slow breathing |
 | `idle`      | connected, nothing urgent   | blinking, looking around    |
 | `busy`      | sessions actively running   | sweating, working           |
-| `attention` | approval pending            | alert, **LED blinks**       |
+| `attention` | approval pending            | alert, prompt overlay shown |
 | `celebrate` | level up (every 50K tokens) | confetti, bouncing          |
-| `dizzy`     | you shook the stick         | spiral eyes, wobbling       |
+| `dizzy`     | (unused on M5 Dial)         | spiral eyes, wobbling       |
 | `heart`     | approved in under 5s        | floating hearts             |
 
 ## Project layout

@@ -1,18 +1,20 @@
 #include "buddy.h"
 #include "buddy_common.h"
-#include <M5StickCPlus.h>
+#include <M5Dial.h>
 #include <string.h>
 
-extern TFT_eSprite spr;
+extern M5Canvas spr;
 
 // Mirrors PersonaState in main.cpp
 enum { B_SLEEP, B_IDLE, B_BUSY, B_ATTENTION, B_CELEBRATE, B_DIZZY, B_HEART };
 
 // ──────────────── shared geometry ────────────────
-const int BUDDY_X_CENTER = 67;
-const int BUDDY_CANVAS_W = 135;
-const int BUDDY_Y_BASE   = 30;
-const int BUDDY_Y_OVERLAY = 6;
+// 240×240 round face. Pet body centered horizontally; vertically anchored
+// at y≈70 so a 5-row 2× sprite (~70px tall) sits in the middle disc.
+const int BUDDY_X_CENTER = 120;
+const int BUDDY_CANVAS_W = 240;
+const int BUDDY_Y_BASE   = 70;
+const int BUDDY_Y_OVERLAY = 46;
 const int BUDDY_CHAR_W   = 6;
 const int BUDDY_CHAR_H   = 8;
 
@@ -30,10 +32,11 @@ const uint16_t BUDDY_BLUE   = 0x041F;
 
 // ──────────────── shared rendering helpers ────────────────
 // Render target indirection: defaults to the sprite, but can retarget to
-// M5.Lcd for landscape clock mode (both inherit TFT_eSPI). Coords stay
-// fixed — species hardcode BUDDY_X_CENTER/BUDDY_Y_OVERLAY in their
-// particle calls, so retargeting position would only move the body.
-static TFT_eSPI* _tgt = &spr;
+// the live display. M5Canvas and M5GFX both inherit from LovyanGFX, so we
+// point at the common base. Coords stay fixed — species hardcode
+// BUDDY_X_CENTER/BUDDY_Y_OVERLAY in their particle calls, so retargeting
+// position would only move the body.
+static LovyanGFX* _tgt = &spr;
 // 2× on home screen, 1× in peek (PET/INFO) and landscape clock. Species
 // art is space-padded to a fixed width for alignment at 1×; at 2× we trim
 // and re-center per line so the padding doesn't push ink off-screen.
@@ -153,17 +156,15 @@ void buddySetPeek(bool peek) {
   buddyInvalidate();
 }
 
-// One-shot render to an arbitrary TFT_eSPI surface (M5.Lcd for landscape
-// clock). Bypasses tick gating and the sprite fillRect — caller owns
-// clearing. Advances the frame counter so animation runs even when
-// buddyTick is bypassed.
-// Landscape clock callsite — always 1×.
-void buddyRenderTo(TFT_eSPI* tgt, uint8_t personaState) {
+// One-shot render to an arbitrary surface. Bypasses tick gating and the
+// sprite fillRect — caller owns clearing. Advances the frame counter so
+// animation runs even when buddyTick is bypassed. Always 1×.
+void buddyRenderTo(M5GFX* tgt, uint8_t personaState) {
   uint8_t prevS = _scale; _scale = 1;
   if (personaState >= 7) personaState = B_IDLE;
   uint32_t now = millis();
   if ((int32_t)(now - nextTickAt) >= 0) { nextTickAt = now + TICK_MS; tickCount++; }
-  TFT_eSPI* prev = _tgt;
+  LovyanGFX* prev = _tgt;
   _tgt = tgt;
   const Species* sp = SPECIES_TABLE[currentSpeciesIdx];
   if (sp->states[personaState]) sp->states[personaState](tickCount);
