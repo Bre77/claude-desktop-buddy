@@ -802,6 +802,9 @@ void drawHUD() {
 void setup() {
   auto cfg = M5.config();
   M5Dial.begin(cfg, /*encoder=*/true, /*rfid=*/false);
+  Serial.begin(115200);
+  delay(200);
+  Serial.println("\n[boot] claude desktop buddy");
 
   startBt();
   applyBrightness();
@@ -1070,13 +1073,7 @@ void loop() {
     spr.pushSprite(0, 0);
   }
 
-  // Auto-off after SCREEN_OFF_MS of inactivity. Kept on while an approval
-  // prompt is up and while on USB (clock face wants to be visible).
-  if (!screenOff && !inPrompt && !_onUsb
-      && millis() - lastInteractMs > SCREEN_OFF_MS) {
-    M5Dial.Display.sleep();
-    screenOff = true;
-  }
+  // Auto-sleep disabled: device is mains-powered, keep the display on.
 
   delay(screenOff ? 100 : 16);
 }

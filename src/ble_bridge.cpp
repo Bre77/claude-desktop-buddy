@@ -72,7 +72,12 @@ class ServerCallbacks : public BLEServerCallbacks {
 // polls blePasskey() to render it.
 class SecCallbacks : public BLESecurityCallbacks {
   uint32_t onPassKeyRequest() override { return 0; }
-  bool onConfirmPIN(uint32_t) override { return false; }
+  // Numeric comparison: central displays a number, we display the same, user
+  // confirms on both. Surface the number on-screen and accept.
+  bool onConfirmPIN(uint32_t pin) override {
+    passkey = pin;
+    return true;
+  }
   bool onSecurityRequest() override { return true; }
   void onPassKeyNotify(uint32_t pk) override {
     passkey = pk;
@@ -91,7 +96,12 @@ void bleInit(const char* deviceName) {
   // Request the biggest MTU we can get. macOS negotiates to 185 typically.
   BLEDevice::setMTU(517);
 
-  BLEDevice::setEncryptionLevel(ESP_BLE_SEC_ENCRYPT_MITM);
+  // Do NOT call BLEDevice::setEncryptionLevel(): on this Arduino-ESP32
+  // BLE stack it fires esp_ble_set_encryption() from ESP_GATTS_CONNECT_EVT
+  // before BTM has registered the peer, which logs "BT_BTM: Device not
+  // found" and aborts pairing. Instead we let the central initiate pairing
+  // when it hits an encrypted characteristic, and SecCallbacks below handles
+  // the SMP exchange.
   BLEDevice::setSecurityCallbacks(new SecCallbacks());
 
   server = BLEDevice::createServer();
